@@ -1,5 +1,7 @@
 const AuthModel = require('../model/Auth.Model');
+const EmailService = require('../services/EmailService');
 const jwt = require('jsonwebtoken');
+const Joi = require('joi');
 const { v4: uuidv4 } = require('uuid');
 
 class AuthController {
@@ -50,7 +52,28 @@ class AuthController {
                 sexo
             });
 
-            // Generar JWT
+            // Generar token de verificación de email
+            const tokenVerificacion = EmailService.generarToken();
+            await AuthModel.crearTokenVerificacion(
+                nuevoUsuario.id_usuario,
+                tokenVerificacion,
+                'email_verification'
+            );
+
+            // Enviar email de verificación
+            try {
+                await EmailService.enviarEmailVerificacion(
+                    email,
+                    nombre_completo,
+                    tokenVerificacion
+                );
+                console.log('✅ Email de verificación enviado a:', email);
+            } catch (emailError) {
+                console.error('⚠️ Error enviando email de verificación:', emailError.message);
+                // No fallar el registro si falla el email
+            }
+
+            // Generar JWT para acceso inmediato (aunque email no esté verificado)
             const token = jwt.sign(
                 {
                     userId: nuevoUsuario.id_usuario,
@@ -63,11 +86,13 @@ class AuthController {
 
             res.status(201).json({
                 success: true,
-                message: 'Usuario registrado exitosamente',
+                message: 'Usuario registrado exitosamente. Revisa tu email para verificar tu cuenta.',
                 data: {
                     usuario: nuevoUsuario,
                     token,
-                    expiresIn: process.env.JWT_EXPIRES_IN
+                    expiresIn: process.env.JWT_EXPIRES_IN,
+                    emailEnviado: true,
+                    nota: 'Verifica tu email para activar todas las funcionalidades'
                 }
             });
 
@@ -112,7 +137,8 @@ class AuthController {
                 {
                     userId: usuario.id_usuario,
                     email: usuario.email,
-                    username: usuario.nombre_usuario
+                    username: usuario.nombre_usuario,
+                    verificado: usuario.email_verificado || false
                 },
                 process.env.JWT_SECRET,
                 { expiresIn: process.env.JWT_EXPIRES_IN }
@@ -261,15 +287,54 @@ class AuthController {
         try {
             const { email } = req.body;
 
+            // Validar entrada
+            const { error } = Joi.object({
+                email: Joi.string().email().required()
+            }).validate({ email });
+
+            if (error) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Email inválido',
+                    details: error.details[0].message
+                });
+            }
+
             const usuario = await AuthModel.buscarUsuarioPorEmail(email);
+
+            // Si el usuario existe, enviar email de reset
+            if (usuario) {
+                // Eliminar tokens previos de reset de contraseña
+                await AuthModel.eliminarTokenesUsuario(usuario.id_usuario, 'password_reset');
+
+                // Generar nuevo token de reset
+                const tokenReset = EmailService.generarToken();
+                await AuthModel.crearTokenVerificacion(
+                    usuario.id_usuario,
+                    tokenReset,
+                    'password_reset'
+                );
+
+                // Enviar email de reset
+                try {
+                    await EmailService.enviarEmailResetPassword(
+                        email,
+                        usuario.nombre_completo,
+                        tokenReset
+                    );
+                    console.log('✅ Email de recuperación enviado a:', email);
+                } catch (emailError) {
+                    console.error('⚠️ Error enviando email de recuperación:', emailError.message);
+                }
+            }
 
             // Por seguridad, siempre devolver success, aunque el email no exista
             res.status(200).json({
                 success: true,
                 message: 'Si el email existe, recibirás instrucciones para resetear tu contraseña',
                 data: {
-                    // En una implementación real, aquí se enviaría un email
-                    info: 'Funcionalidad de reset de contraseña pendiente de implementar'
+                    emailEnviado: true,
+                    fecha: new Date().toISOString()
                 }
             });
 
@@ -288,10 +353,60 @@ class AuthController {
         try {
             const { token, nuevaPassword } = req.body;
 
-            // Implementar lógica de reset de contraseña
+            // Validar entrada
+            const { error } = Joi.object({
+                token: Joi.string().required(),
+                nuevaPassword: Joi.string().min(8).pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/).required()
+                    .messages({
+                        'string.min': 'La contraseña debe tener al menos 8 caracteres',
+                        'string.pattern.base': 'La contraseña debe contener al menos una mayúscula, una minúscula y un número'
+                    })
+            }).validate({ token, nuevaPassword });
+
+            if (error) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Datos inválidos',
+                    details: error.details[0].message
+                });
+            }
+
+            // Verificar que el token existe y está vigente
+            const tokenInfo = await AuthModel.verificarTokenVerificacion(token, 'password_reset');
+
+            if (!tokenInfo) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Token de recuperación inválido o expirado'
+                });
+            }
+
+            // Actualizar la contraseña del usuario
+            await AuthModel.actualizarPassword(tokenInfo.id_usuario, nuevaPassword);
+
+            // Eliminar el token usado y otros tokens de reset del usuario
+            await AuthModel.eliminarTokenesUsuario(tokenInfo.id_usuario, 'password_reset');
+
+            // Obtener info del usuario para el email
+            const usuario = await AuthModel.buscarPorId(tokenInfo.id_usuario);
+
+            // Enviar email de confirmación
+            try {
+                await EmailService.enviarEmailConfirmacionCambio(
+                    usuario.email,
+                    usuario.nombre_completo
+                );
+            } catch (emailError) {
+                console.error('⚠️ Error enviando email de confirmación:', emailError.message);
+            }
+
             res.status(200).json({
                 success: true,
-                message: 'Funcionalidad de reset de contraseña pendiente de implementar'
+                message: 'Contraseña actualizada exitosamente',
+                data: {
+                    passwordActualizada: true,
+                    fecha: new Date().toISOString()
+                }
             });
 
         } catch (error) {
@@ -313,14 +428,95 @@ class AuthController {
         try {
             const { token } = req.params;
 
-            // Implementar lógica de verificación de email
+            if (!token) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Token de verificación requerido'
+                });
+            }
+
+            // Verificar que el token existe y está vigente
+            const tokenInfo = await AuthModel.verificarTokenVerificacion(token, 'email_verification');
+
+            if (!tokenInfo) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Token de verificación inválido o expirado'
+                });
+            }
+
+            // Verificar el email del usuario
+            await AuthModel.verificarEmailUsuario(tokenInfo.id_usuario);
+
+            // Eliminar el token usado
+            await AuthModel.eliminarToken(token);
+
             res.status(200).json({
                 success: true,
-                message: 'Funcionalidad de verificación de email pendiente de implementar'
+                message: 'Email verificado exitosamente. Tu cuenta está ahora activa.',
+                data: {
+                    emailVerificado: true,
+                    fecha: new Date().toISOString()
+                }
             });
 
         } catch (error) {
             console.error('Error en verificarEmail:', error.message);
+            res.status(500).json({
+                success: false,
+                message: 'Error interno del servidor',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        }
+    }
+
+    // Verificar primer login con token
+    static async verificarPrimerLogin(req, res) {
+        try {
+            const { token } = req.params;
+
+            if (!token) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Token de verificación requerido'
+                });
+            }
+
+            // Verificar que el token existe y está vigente
+            const tokenInfo = await AuthModel.verificarTokenVerificacion(token, 'first_login_verification');
+
+            if (!tokenInfo) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Token de verificación inválido o expirado'
+                });
+            }
+
+            // Marcar usuario como verificado en primer login
+            await AuthModel.verificarEmailUsuario(tokenInfo.id_usuario);
+
+            // Eliminar el token usado
+            await AuthModel.eliminarToken(token);
+
+            // Obtener datos del usuario
+            const usuario = await AuthModel.buscarPorId(tokenInfo.id_usuario);
+
+            res.status(200).json({
+                success: true,
+                message: 'Primer login verificado exitosamente. Tu cuenta está confirmada.',
+                data: {
+                    primerLoginVerificado: true,
+                    usuario: {
+                        id: usuario.id_usuario,
+                        email: usuario.email,
+                        nombre: usuario.nombre_completo
+                    },
+                    fecha: new Date().toISOString()
+                }
+            });
+
+        } catch (error) {
+            console.error('Error en verificarPrimerLogin:', error.message);
             res.status(500).json({
                 success: false,
                 message: 'Error interno del servidor',
