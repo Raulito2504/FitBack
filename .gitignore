@@ -1,0 +1,43 @@
+# Node modules
+node_modules/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build output
+dist/
+build/
+
+# IDE/editor folders
+.vscode/
+.idea/
+
+# Kiro IDE - mantener configuraciones para el equipo
+# .kiro/ - NO ignorar, es útil para el equipo
+
+# Optional npm cache directory
+.npm/
+
+# Dependency directories
+jspm_packages/
+
+# Misc
+*.tgz
+*.swp
+
+# Coverage directory used by testing tools
+coverage/
+
