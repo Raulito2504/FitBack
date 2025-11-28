@@ -390,24 +390,3 @@ Este proyecto está bajo la Licencia MIT. Ver `LICENSE` para más detalles.
 ## 👥 Autores
 
 - **Arnoldo Rafael** - *Desarrollo inicial* - [Raulito2504](https://github.com/Raulito2504)
-
-## 🙏 Agradecimientos
-
-- Express.js community
-- PostgreSQL team
-- JWT.io
-- Joi validation library
-
----
-
-## 📞 Soporte
-
-Si tienes problemas o preguntas:
-
-1. Revisa esta documentación
-2. Busca en [Issues](https://github.com/Raulito2504/FitBack/issues)
-3. Crea un nuevo issue con detalles del problema
-
----
-
-**¡Happy coding! 🚀**
