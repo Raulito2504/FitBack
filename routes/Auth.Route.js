@@ -64,11 +64,6 @@ router.get('/verificar-email/:token',
     authController.verificarEmail
 );
 
-// Verificar primer login con token
-router.get('/verificar-primer-login/:token',
-    authController.verificarPrimerLogin
-);
-
 // Reenviar email de verificación
 router.post('/reenviar-verificacion',
     authMiddleware.verificarToken,

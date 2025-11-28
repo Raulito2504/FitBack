@@ -18,7 +18,7 @@ const corsOptions = {
         if (allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
-            console.warn(`❌ CORS bloqueado para origen: ${origin}`);
+            console.warn(`CORS bloqueado para origen: ${origin}`);
             callback(new Error('No permitido por CORS'));
         }
     },
@@ -34,15 +34,15 @@ const corsOptions = {
         'Pragma'
     ],
     exposedHeaders: ['Authorization'],
-    maxAge: 86400 // 24 horas
+    maxAge: 86400
 };
 
 // En desarrollo, permitir todos los orígenes
 if (process.env.NODE_ENV === 'development') {
     corsOptions.origin = true;
-    console.log('🔓 CORS en modo desarrollo - todos los orígenes permitidos');
+    console.log('CORS en modo desarrollo - todos los orígenes permitidos');
 } else {
-    console.log('🔒 CORS en modo producción - orígenes restringidos:', allowedOrigins);
+    console.log('CORS en modo producción - orígenes restringidos:', allowedOrigins);
 }
 
 module.exports = corsOptions;
