@@ -3,29 +3,24 @@ const jwt = require("jsonwebtoken")
 const { v4: uuidv4 } = require("uuid")
 
 class AuthController {
-
   // REGISTRO Y LOGIN
 
   // => REGISTRAR USUARIO
   static async registrarUsuario(req, res) {
     try {
-      const { email, password, nombre_usuario, nombre_completo, telefono, fecha_nacimiento, sexo } = req.body
-
-      // Validar campos requeridos
-      if (!email || !password || !nombre_usuario || !nombre_completo) {
+      const { email, password, usuario } = req.body
+      if (!email || !password || !usuario) {
         return res.status(400).json({
           success: false,
           message: "Faltan campos requeridos",
           errores: [
             { campo: "email", mensaje: "El email es requerido" },
             { campo: "password", mensaje: "La contraseña es requerida" },
-            { campo: "nombre_usuario", mensaje: "El nombre de usuario es requerido" },
-            { campo: "nombre_completo", mensaje: "El nombre completo es requerido" },
+            { campo: "usuario", mensaje: "El nombre de usuario es requerido" },
           ].filter((e) => !req.body[e.campo]),
         })
       }
-
-      // => VERIFICAR SI EL MAIL YA EXISTE
+      // => Verifica el mail
       const usuarioExistente = await AuthModel.buscarUsuarioPorEmail(email)
       if (usuarioExistente) {
         return res.status(400).json({
@@ -33,38 +28,29 @@ class AuthController {
           message: "El email ya está registrado",
         })
       }
-
       // Verificar si el username ya existe
-      const usernameExistente = await AuthModel.buscarUsuarioPorUsername(nombre_usuario)
+      const usernameExistente = await AuthModel.buscarUsuarioPorUsername(usuario)
       if (usernameExistente) {
         return res.status(400).json({
           success: false,
           message: "El nombre de usuario ya está en uso",
         })
       }
-
-      // Crear usuario (fecha_nacimiento y sexo son opcionales)
       const nuevoUsuario = await AuthModel.crearUsuario({
         email,
         password,
-        nombre_usuario,
-        nombre_completo,
-        telefono: telefono || null,
-        fecha_nacimiento: fecha_nacimiento || null,
-        sexo: sexo || null,
+        usuario,
       })
-
       // Generar JWT
       const token = jwt.sign(
         {
-          userId: nuevoUsuario.id_usuario,
+          id: nuevoUsuario.id,
           email: nuevoUsuario.email,
-          username: nuevoUsuario.nombre_usuario,
+          usuario: nuevoUsuario.usuario,
         },
         process.env.JWT_SECRET,
         { expiresIn: process.env.JWT_EXPIRES_IN },
       )
-
       res.status(201).json({
         success: true,
         message: "Usuario registrado exitosamente",
@@ -83,12 +69,10 @@ class AuthController {
       })
     }
   }
-
   // Login de usuario
   static async loginUsuario(req, res) {
     try {
       const { email, password } = req.body
-
       // Buscar usuario por email
       const usuario = await AuthModel.buscarUsuarioPorEmail(email)
       if (!usuario) {
@@ -97,7 +81,6 @@ class AuthController {
           message: "Credenciales inválidas",
         })
       }
-
       // Verificar contraseña
       const passwordValida = await AuthModel.verificarPassword(password, usuario.hash_contrasena)
       if (!passwordValida) {
@@ -106,24 +89,20 @@ class AuthController {
           message: "Credenciales inválidas",
         })
       }
-
       // Actualizar última actividad
-      await AuthModel.actualizarUltimaActividad(usuario.id_usuario)
-
+      await AuthModel.actualizarUltimaActividad(usuario.id)
       // Generar JWT
       const token = jwt.sign(
         {
-          userId: usuario.id_usuario,
+          id: usuario.id,
           email: usuario.email,
-          username: usuario.nombre_usuario,
+          usuario: usuario.usuario,
         },
         process.env.JWT_SECRET,
         { expiresIn: process.env.JWT_EXPIRES_IN },
       )
-
       // Remover datos sensibles
       const { hash_contrasena, ...usuarioSinPassword } = usuario
-
       res.status(200).json({
         success: true,
         message: "Login exitoso",
@@ -142,15 +121,9 @@ class AuthController {
       })
     }
   }
-
   // Logout de usuario
   static async logoutUsuario(req, res) {
     try {
-      // En una implementación más avanzada, aquí se podría:
-      // 1. Invalidar el token en una blacklist
-      // 2. Eliminar refresh tokens de la base de datos
-      // 3. Limpiar sesiones activas
-
       res.status(200).json({
         success: true,
         message: "Logout exitoso",
@@ -167,37 +140,31 @@ class AuthController {
       })
     }
   }
-
   // =================================
   // GESTIÓN DE TOKENS
   // =================================
-
   // Refresh token
   static async refreshToken(req, res) {
     try {
-      const usuario = await AuthModel.buscarPorId(req.usuario.userId)
-
+      const usuario = await AuthModel.buscarPorId(req.usuario.id)
       if (!usuario) {
         return res.status(404).json({
           success: false,
           message: "Usuario no encontrado",
         })
       }
-
       // Generar nuevo token
       const nuevoToken = jwt.sign(
         {
-          userId: usuario.id_usuario,
+          id: usuario.id,
           email: usuario.email,
-          username: usuario.nombre_usuario,
+          usuario: usuario.usuario,
         },
         process.env.JWT_SECRET,
         { expiresIn: process.env.JWT_EXPIRES_IN },
       )
-
       // Actualizar última actividad
-      await AuthModel.actualizarUltimaActividad(usuario.id_usuario)
-
+      await AuthModel.actualizarUltimaActividad(usuario.id)
       res.status(200).json({
         success: true,
         message: "Token renovado exitosamente",
@@ -215,26 +182,23 @@ class AuthController {
       })
     }
   }
-
   // Verificar si el token sigue siendo válido
   static async verificarToken(req, res) {
     try {
-      const usuario = await AuthModel.buscarPorId(req.usuario.userId)
-
+      const usuario = await AuthModel.buscarPorId(req.usuario.id)
       if (!usuario) {
         return res.status(404).json({
           success: false,
           message: "Usuario no encontrado",
         })
       }
-
       res.status(200).json({
         success: true,
         message: "Token válido",
         data: {
-          userId: usuario.id_usuario,
+          id: usuario.id,
           email: usuario.email,
-          username: usuario.nombre_usuario,
+          username: usuario.usuario,
           tokenInfo: {
             isValid: true,
             expiresIn: process.env.JWT_EXPIRES_IN,
@@ -250,19 +214,14 @@ class AuthController {
       })
     }
   }
-
   // =================================
   // RECUPERACIÓN DE CONTRASEÑA
   // =================================
-
   // Solicitar reset de contraseña
   static async solicitarResetPassword(req, res) {
     try {
       const { email } = req.body
-
       const usuario = await AuthModel.buscarUsuarioPorEmail(email)
-
-      // Por seguridad, siempre devolver success, aunque el email no exista
       res.status(200).json({
         success: true,
         message: "Si el email existe, recibirás instrucciones para resetear tu contraseña",
@@ -280,13 +239,10 @@ class AuthController {
       })
     }
   }
-
   // Reset de contraseña con token
   static async resetPassword(req, res) {
     try {
       const { token, nuevaPassword } = req.body
-
-      // Implementar lógica de reset de contraseña
       res.status(200).json({
         success: true,
         message: "Funcionalidad de reset de contraseña pendiente de implementar",
@@ -300,16 +256,13 @@ class AuthController {
       })
     }
   }
-
   // =================================
   // VERIFICACIÓN DE EMAIL
   // =================================
-
   // Verificar email con token
   static async verificarEmail(req, res) {
     try {
       const { token } = req.params
-
       // Implementar lógica de verificación de email
       res.status(200).json({
         success: true,
@@ -324,26 +277,22 @@ class AuthController {
       })
     }
   }
-
   // Reenviar email de verificación
   static async reenviarVerificacion(req, res) {
     try {
-      const usuario = await AuthModel.buscarPorId(req.usuario.userId)
-
+      const usuario = await AuthModel.buscarPorId(req.usuario.id)
       if (!usuario) {
         return res.status(404).json({
           success: false,
           message: "Usuario no encontrado",
         })
       }
-
       if (usuario.email_verificado) {
         return res.status(400).json({
           success: false,
           message: "El email ya está verificado",
         })
       }
-
       // Implementar lógica de reenvío de email
       res.status(200).json({
         success: true,
@@ -367,9 +316,7 @@ class AuthController {
   static async verificarEmailDisponible(req, res) {
     try {
       const { email } = req.body
-
       const disponible = await AuthModel.emailDisponible(email)
-
       res.status(200).json({
         success: true,
         message: disponible ? "Email disponible" : "Email ya registrado",
@@ -387,20 +334,17 @@ class AuthController {
       })
     }
   }
-
   // Verificar disponibilidad de username
   static async verificarUsernameDisponible(req, res) {
     try {
-      const { nombre_usuario } = req.body
-
-      const disponible = await AuthModel.usernameDisponible(nombre_usuario)
-
+      const { usuario } = req.body
+      const disponible = await AuthModel.usernameDisponible(usuario)
       res.status(200).json({
         success: true,
         message: disponible ? "Username disponible" : "Username ya en uso",
         data: {
           disponible,
-          nombre_usuario: nombre_usuario,
+          usuario: usuario,
         },
       })
     } catch (error) {

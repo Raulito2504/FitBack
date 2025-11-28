@@ -1,11 +1,12 @@
 const UsuariosModel = require("../model/Usuarios.Model")
 
-class UsuariosController {       // GESTIÓN DE PERFIL 
+class UsuariosController {
+  // GESTIÓN DE PERFIL
 
   // => OBTIENE EL USUARIO ACTUAL.
   static async obtenerPerfil(req, res) {
     try {
-      const usuario = await UsuariosModel.buscarPorId(req.usuario.userId)
+      const usuario = await UsuariosModel.buscarPorId(req.usuario.id)
       if (!usuario) {
         return res.status(404).json({
           success: false,
@@ -28,10 +29,19 @@ class UsuariosController {       // GESTIÓN DE PERFIL
   }
 
   // => ACTUALIZA EL PERFIL DEL USUARIO
-  static async actualizarPerfil(req, res) {
+
+   static async actualizarPerfil(req, res) {
     try {
       const datosActualizacion = req.body
-      const usuarioActualizado = await UsuariosModel.actualizarPerfil(req.usuario.userId, datosActualizacion)
+
+      if (datosActualizacion.altura_cm && datosActualizacion.peso_actual) {
+        const alturaEnMetros = datosActualizacion.altura_cm / 100
+        datosActualizacion.imc = Number.parseFloat(
+          (datosActualizacion.peso_actual / (alturaEnMetros * alturaEnMetros)).toFixed(2),
+        )
+      }
+
+      const usuarioActualizado = await UsuariosModel.actualizarPerfil(req.usuario.id, datosActualizacion)
       if (!usuarioActualizado) {
         return res.status(404).json({
           success: false,
@@ -56,8 +66,14 @@ class UsuariosController {       // GESTIÓN DE PERFIL
   static async completarPerfilProgresivo(req, res) {
     try {
       const datosActualizacion = req.body
-      const usuarioActualizado = await UsuariosModel.actualizarPerfil(req.usuario.userId, datosActualizacion)
 
+      if (datosActualizacion.altura_cm && datosActualizacion.peso_actual) {
+        const alturaEnMetros = datosActualizacion.altura_cm / 100
+        datosActualizacion.imc = Number.parseFloat(
+          (datosActualizacion.peso_actual / (alturaEnMetros * alturaEnMetros)).toFixed(2),
+        )
+      }
+      const usuarioActualizado = await UsuariosModel.actualizarPerfil(req.usuario.id, datosActualizacion)
       if (!usuarioActualizado) {
         return res.status(404).json({
           success: false,
@@ -83,7 +99,6 @@ class UsuariosController {       // GESTIÓN DE PERFIL
   static async cambiarPassword(req, res) {
     try {
       const { passwordActual, passwordNueva } = req.body
-      // Obtener usuario actual con contraseña
       const usuario = await UsuariosModel.buscarPorEmailCompleto(req.usuario.email)
       if (!usuario) {
         return res.status(404).json({
@@ -91,7 +106,6 @@ class UsuariosController {       // GESTIÓN DE PERFIL
           message: "Usuario no encontrado",
         })
       }
-      // Verificar contraseña actual
       const passwordValida = await UsuariosModel.verificarPassword(passwordActual, usuario.hash_contrasena)
       if (!passwordValida) {
         return res.status(400).json({
@@ -99,8 +113,7 @@ class UsuariosController {       // GESTIÓN DE PERFIL
           message: "La contraseña actual es incorrecta",
         })
       }
-      // Cambiar contraseña
-      await UsuariosModel.cambiarPassword(req.usuario.userId, passwordNueva)
+      await UsuariosModel.cambiarPassword(req.usuario.id, passwordNueva)
       res.status(200).json({
         success: true,
         message: "Contraseña cambiada exitosamente",
@@ -114,19 +127,16 @@ class UsuariosController {       // GESTIÓN DE PERFIL
       })
     }
   }
-
   // ELIMINAR CUENTA
   static async eliminarCuenta(req, res) {
     try {
-      const usuarioEliminado = await UsuariosModel.eliminar(req.usuario.userId)
-
+      const usuarioEliminado = await UsuariosModel.eliminar(req.usuario.id)
       if (!usuarioEliminado) {
         return res.status(404).json({
           success: false,
           message: "Usuario no encontrado",
         })
       }
-
       res.status(200).json({
         success: true,
         message: "Cuenta eliminada exitosamente",
@@ -140,11 +150,7 @@ class UsuariosController {       // GESTIÓN DE PERFIL
       })
     }
   }
-
-  
   // FUNCIONES ADMINISTRATIVAS
-
-
   // => OBTENER TODOS LOS USUARIOS
   static async obtenerTodosUsuarios(req, res) {
     try {
@@ -194,18 +200,16 @@ class UsuariosController {       // GESTIÓN DE PERFIL
 
   // ESTADÍSTICAS Y DATOS ADICIONALES
 
-
   // OBTENER ESTADÍSTICAS DEL USUARIO
   static async obtenerEstadisticasUsuario(req, res) {
     try {
-      const usuario = await UsuariosModel.buscarPorId(req.usuario.userId)
+      const usuario = await UsuariosModel.buscarPorId(req.usuario.id)
       if (!usuario) {
         return res.status(404).json({
           success: false,
           message: "Usuario no encontrado",
         })
       }
-      // Aquí se pueden agregar más estadísticas (por si hace falta poner una y se me paso).
       const estadisticas = {
         fechaRegistro: usuario.fecha_creacion,
         ultimaActividad: usuario.fecha_ultima_actividad,

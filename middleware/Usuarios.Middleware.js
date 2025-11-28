@@ -5,85 +5,6 @@ class UsuariosMiddleware {
   // VALIDACIONES DE PERFIL
   // =================================
 
-  // Validar actualización de perfil
-  static async validarActualizacionPerfil(req, res, next) {
-    try {
-      const schema = Joi.object({
-        nombre_completo: Joi.string()
-          .min(2)
-          .max(150)
-          .pattern(/^[a-zA-ZÀ-ÿ\s]+$/)
-          .messages({
-            "string.min": "El nombre completo debe tener al menos 2 caracteres",
-            "string.max": "El nombre completo es demasiado largo (máximo 150 caracteres)",
-            "string.pattern.base": "El nombre completo solo puede contener letras y espacios",
-          }),
-
-        telefono: Joi.string()
-          .pattern(/^[+]?[0-9\s()-]{10,20}$/)
-          .allow("", null)
-          .messages({
-            "string.pattern.base": "Formato de teléfono inválido",
-          }),
-
-        fecha_nacimiento: Joi.date().max("now").messages({
-          "date.max": "La fecha de nacimiento no puede ser futura",
-        }),
-      }).min(1) // Al menos un campo debe estar presente
-
-      const { error, value } = schema.validate(req.body, {
-        abortEarly: false,
-        stripUnknown: true,
-        allowUnknown: false,
-      })
-
-      if (error) {
-        const errores = error.details.map((detalle) => ({
-          campo: detalle.path[0],
-          mensaje: detalle.message,
-          valorRecibido: detalle.context?.value,
-        }))
-
-        return res.status(400).json({
-          success: false,
-          message: "Datos de entrada inválidos",
-          errores,
-        })
-      }
-
-      if (Object.keys(value).length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: "Debe proporcionar al menos un campo para actualizar",
-        })
-      }
-
-      // Validación adicional de edad si se proporciona fecha_nacimiento
-      if (value.fecha_nacimiento) {
-        const fechaNacimiento = new Date(value.fecha_nacimiento)
-        const fechaMinima = new Date()
-        fechaMinima.setFullYear(fechaMinima.getFullYear() - 13)
-
-        if (fechaNacimiento > fechaMinima) {
-          return res.status(400).json({
-            success: false,
-            message: "Debe ser mayor de 13 años",
-            error: "AGE_RESTRICTION",
-          })
-        }
-      }
-
-      req.body = value
-      next()
-    } catch (error) {
-      console.error("Error en validarActualizacionPerfil:", error.message)
-      res.status(500).json({
-        success: false,
-        message: "Error interno del servidor",
-      })
-    }
-  }
-
   // Validar cambio de contraseña
   static async validarCambioPassword(req, res, next) {
     try {
@@ -92,7 +13,6 @@ class UsuariosMiddleware {
           "string.min": "La contraseña actual es requerida",
           "any.required": "La contraseña actual es requerida",
         }),
-
         passwordNueva: Joi.string()
           .min(8)
           .max(128)
@@ -106,25 +26,21 @@ class UsuariosMiddleware {
             "any.required": "La nueva contraseña es requerida",
           }),
       })
-
       const { error, value } = schema.validate(req.body, {
         abortEarly: false,
         stripUnknown: true,
       })
-
       if (error) {
         const errores = error.details.map((detalle) => ({
           campo: detalle.path[0],
           mensaje: detalle.message,
         }))
-
         return res.status(400).json({
           success: false,
           message: "Datos de entrada inválidos",
           errores,
         })
       }
-
       // Verificar que la nueva contraseña sea diferente a la actual
       if (value.passwordActual === value.passwordNueva) {
         return res.status(400).json({
@@ -132,7 +48,6 @@ class UsuariosMiddleware {
           message: "La nueva contraseña debe ser diferente a la actual",
         })
       }
-
       req.body = value
       next()
     } catch (error) {
@@ -143,72 +58,56 @@ class UsuariosMiddleware {
       })
     }
   }
-
   // Validar completar perfil
   static async validarCompletarPerfil(req, res, next) {
     try {
       const schema = Joi.object({
-        fecha_nacimiento: Joi.date().max("now").required().messages({
-          "date.max": "La fecha de nacimiento no puede ser futura",
-          "any.required": "La fecha de nacimiento es requerida",
+        edad: Joi.number().integer().min(18).max(100).required().messages({
+          "number.min": "Debe ser mayor de 18 años",
+          "number.max": "La edad debe ser menor de 100 años",
+          "any.required": "La edad es requerida",
         }),
-
-        sexo: Joi.string().valid("masculino", "femenino", "otro").required().messages({
-          "any.only": "El sexo debe ser masculino, femenino u otro",
+        altura_cm: Joi.number().min(100).max(250).precision(1).required().messages({
+          "number.min": "La estatura debe ser al menos 100 cm",
+          "number.max": "La estatura no puede ser mayor a 250 cm",
+          "any.required": "La estatura es requerida",
+        }),
+        sexo: Joi.boolean().required().messages({
+          "boolean.base": "El sexo debe ser un valor booleano (true para masculino, false para femenino)",
           "any.required": "El sexo es requerido",
         }),
-
-        peso_actual: Joi.number().min(30).max(300).precision(2).required().messages({
+        peso_actual: Joi.number().min(30).max(150).precision(2).required().messages({
           "number.min": "El peso actual debe ser al menos 30 kg",
-          "number.max": "El peso actual no puede ser mayor a 300 kg",
+          "number.max": "El peso actual no puede ser mayor a 150 kg",
           "any.required": "El peso actual es requerido",
         }),
-
-        peso_deseado: Joi.number().min(30).max(300).precision(2).required().messages({
+        peso_deseado: Joi.number().min(30).max(150).precision(2).required().messages({
           "number.min": "El peso deseado debe ser al menos 30 kg",
-          "number.max": "El peso deseado no puede ser mayor a 300 kg",
+          "number.max": "El peso deseado no puede ser mayor a 150 kg",
           "any.required": "El peso deseado es requerido",
         }),
-
         objetivo: Joi.string().valid("bajar peso", "mantener", "tonificar").required().messages({
           "any.only": "El objetivo debe ser 'bajar peso', 'mantener' o 'tonificar'",
           "any.required": "El objetivo es requerido",
         }),
       })
-
       const { error, value } = schema.validate(req.body, {
         abortEarly: false,
         stripUnknown: true,
         allowUnknown: false,
       })
-
       if (error) {
         const errores = error.details.map((detalle) => ({
           campo: detalle.path[0],
           mensaje: detalle.message,
           valorRecibido: detalle.context?.value,
         }))
-
         return res.status(400).json({
           success: false,
           message: "Datos de entrada inválidos",
           errores,
         })
       }
-
-      // Validación adicional de edad
-      const fechaNacimiento = new Date(value.fecha_nacimiento)
-      const fechaMinima = new Date()
-      fechaMinima.setFullYear(fechaMinima.getFullYear() - 13)
-
-      if (fechaNacimiento > fechaMinima) {
-        return res.status(400).json({
-          success: false,
-          message: "Debe ser mayor de 13 años",
-          error: "AGE_RESTRICTION",
-        })
-      }
-
       req.body = value
       next()
     } catch (error) {
@@ -233,7 +132,6 @@ class UsuariosMiddleware {
           "number.integer": "La página debe ser un número entero",
           "number.min": "La página debe ser mayor a 0",
         }),
-
         limite: Joi.number().integer().min(1).max(100).default(50).messages({
           "number.base": "El límite debe ser un número",
           "number.integer": "El límite debe ser un número entero",
@@ -241,9 +139,7 @@ class UsuariosMiddleware {
           "number.max": "El límite no puede ser mayor a 100",
         }),
       })
-
       const { error, value } = schema.validate(req.query)
-
       if (error) {
         return res.status(400).json({
           success: false,
@@ -251,7 +147,6 @@ class UsuariosMiddleware {
           error: error.details[0].message,
         })
       }
-
       req.query = value
       next()
     } catch (error) {
@@ -262,7 +157,6 @@ class UsuariosMiddleware {
       })
     }
   }
-
   // Validar ID de usuario
   static async validarIdUsuario(req, res, next) {
     try {
@@ -274,9 +168,7 @@ class UsuariosMiddleware {
           "any.required": "El ID es requerido",
         }),
       })
-
       const { error, value } = schema.validate(req.params)
-
       if (error) {
         return res.status(400).json({
           success: false,
@@ -284,7 +176,6 @@ class UsuariosMiddleware {
           error: error.details[0].message,
         })
       }
-
       req.params = value
       next()
     } catch (error) {

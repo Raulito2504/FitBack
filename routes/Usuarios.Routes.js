@@ -17,7 +17,6 @@ router.get("/perfil", authMiddleware.verificarToken, usuariosController.obtenerP
 router.put(
   "/perfil",
   authMiddleware.verificarToken,
-  usuariosMiddleware.validarActualizacionPerfil,
   usuariosController.actualizarPerfil,
 )
 
