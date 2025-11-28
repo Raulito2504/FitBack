@@ -119,6 +119,71 @@ class UsuariosMiddleware {
     }
   }
 
+  // Validar actualización parcial de perfil (campos opcionales)
+  static async validarActualizacionPerfil(req, res, next) {
+    try {
+      const schema = Joi.object({
+        edad: Joi.number().integer().min(18).max(100).optional().messages({
+          "number.min": "Debe ser mayor de 18 años",
+          "number.max": "La edad debe ser menor de 100 años",
+        }),
+        altura_cm: Joi.number().min(100).max(250).precision(1).optional().messages({
+          "number.min": "La estatura debe ser al menos 100 cm",
+          "number.max": "La estatura no puede ser mayor a 250 cm",
+        }),
+        sexo: Joi.boolean().optional().messages({
+          "boolean.base": "El sexo debe ser un valor booleano (true para masculino, false para femenino)",
+        }),
+        peso_actual: Joi.number().min(30).max(150).precision(2).optional().messages({
+          "number.min": "El peso actual debe ser al menos 30 kg",
+          "number.max": "El peso actual no puede ser mayor a 150 kg",
+        }),
+        peso_deseado: Joi.number().min(30).max(150).precision(2).optional().messages({
+          "number.min": "El peso deseado debe ser al menos 30 kg",
+          "number.max": "El peso deseado no puede ser mayor a 150 kg",
+        }),
+        objetivo: Joi.string().valid("bajar peso", "mantener", "tonificar").optional().messages({
+          "any.only": "El objetivo debe ser 'bajar peso', 'mantener' o 'tonificar'",
+        }),
+      })
+
+      const { error, value } = schema.validate(req.body, {
+        abortEarly: false,
+        stripUnknown: true,
+      })
+
+      if (error) {
+        const errores = error.details.map((detalle) => ({
+          campo: detalle.path[0],
+          mensaje: detalle.message,
+          valorRecibido: detalle.context?.value,
+        }))
+        return res.status(400).json({
+          success: false,
+          message: "Datos de entrada inválidos",
+          errores,
+        })
+      }
+
+      // Verificar que al menos un campo esté presente
+      if (Object.keys(value).length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Debe proporcionar al menos un campo para actualizar",
+        })
+      }
+
+      req.body = value
+      next()
+    } catch (error) {
+      console.error("Error en validarActualizacionPerfil:", error.message)
+      res.status(500).json({
+        success: false,
+        message: "Error interno del servidor",
+      })
+    }
+  }
+
   // =================================
   // VALIDACIONES DE CONSULTA
   // =================================

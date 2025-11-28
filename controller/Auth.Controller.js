@@ -259,6 +259,10 @@ class AuthController {
   // =================================
   // VERIFICACIÓN DE EMAIL
   // =================================
+  // ⚠️ TEMPORALMENTE DESHABILITADO - Código mantenido para futura implementación
+  // TODO: Decidir dónde implementar la verificación de email
+
+  /*
   // Verificar email con token
   static async verificarEmail(req, res) {
     try {
@@ -307,6 +311,7 @@ class AuthController {
       })
     }
   }
+  */
 
   // =================================
   // VALIDACIONES DE DISPONIBILIDAD

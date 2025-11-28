@@ -160,7 +160,7 @@ class UsuariosModel {
       valores.push(new Date())
       contador++
       // Añadir ID del usuario
-      valores.push(id)  
+      valores.push(id)
       const sqlQuery = `UPDATE usuarios SET ${campos.join(", ")} WHERE id = $${contador} RETURNING id, email, usuario, edad, sexo, altura_cm, peso_actual, peso_deseado, imc, objetivo, fecha_creacion, fecha_ultima_actividad, email_verificado`
       const result = await query(sqlQuery, valores)
       return result.rows[0]
@@ -188,7 +188,9 @@ class UsuariosModel {
       throw error
     }
   }
-  // Verificar email
+  // ⚠️ TEMPORALMENTE DESHABILITADO - Verificar email
+  // TODO: Decidir dónde implementar la verificación de email
+  /*
   static async verificarEmail(id) {
     try {
       const result = await query(
@@ -205,6 +207,7 @@ class UsuariosModel {
       throw error
     }
   }
+  */
   // Actualizar última actividad
   static async actualizarUltimaActividad(id) {
     try {
