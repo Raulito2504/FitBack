@@ -5,18 +5,27 @@ const router = express.Router();
 const authController = require('../controller/Auth.Controller');
 const authMiddleware = require('../middleware/Auth.Middleware');
 
+// Importar rate limiters desde configuración
+const {
+    loginLimiter,
+    registroLimiter,
+    passwordRecoveryLimiter
+} = require('../config/rateLimiter');
+
 // =================================
 // RUTAS DE AUTENTICACIÓN
 // =================================
 
 // Registro de usuario
 router.post('/registro',
+    registroLimiter,
     authMiddleware.validarRegistro,
     authController.registrarUsuario
 );
 
 // Login de usuario
 router.post('/login',
+    loginLimiter,
     authMiddleware.validarLogin,
     authController.loginUsuario
 );
@@ -45,12 +54,14 @@ router.get('/verificar-token',
 
 // Solicitar reset de contraseña
 router.post('/forgot-password',
+    passwordRecoveryLimiter,
     authMiddleware.validarEmail,
     authController.solicitarResetPassword
 );
 
 // Resetear contraseña con token
 router.post('/reset-password',
+    passwordRecoveryLimiter,
     authMiddleware.validarResetPassword,
     authController.resetPassword
 );
@@ -58,17 +69,19 @@ router.post('/reset-password',
 // =================================
 // VERIFICACIÓN DE EMAIL
 // =================================
+// ⚠️ TEMPORALMENTE DESHABILITADO - Código mantenido para futura implementación
+// TODO: Decidir dónde implementar la verificación de email
 
 // Verificar email con token
-router.get('/verificar-email/:token',
-    authController.verificarEmail
-);
+// router.get('/verificar-email/:token',
+//     authController.verificarEmail
+// );
 
 // Reenviar email de verificación
-router.post('/reenviar-verificacion',
-    authMiddleware.verificarToken,
-    authController.reenviarVerificacion
-);
+// router.post('/reenviar-verificacion',
+//     authMiddleware.verificarToken,
+//     authController.reenviarVerificacion
+// );
 
 // =================================
 // VALIDACIÓN DE DISPONIBILIDAD

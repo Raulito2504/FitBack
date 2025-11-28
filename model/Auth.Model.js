@@ -56,7 +56,7 @@ class AuthModel {
       const saltRounds = 12
       const hash_contrasena = await bcrypt.hash(password, saltRounds)
 
-      
+
       // Insertar usuario con campos opcionales
       const result = await client.query(
         `INSERT INTO usuarios 
@@ -144,6 +144,10 @@ class AuthModel {
   // =================================
   // FUNCIONES DE VERIFICACIÓN DE EMAIL
   // =================================
+  // ⚠️ TEMPORALMENTE DESHABILITADO - Código mantenido para futura implementación
+  // TODO: Decidir dónde implementar la verificación de email
+
+  /*
   // Verificar email
   static async verificarEmail(id) {
     try {
@@ -170,6 +174,7 @@ class AuthModel {
       throw error
     }
   }
+  */
 }
 
 module.exports = AuthModel
